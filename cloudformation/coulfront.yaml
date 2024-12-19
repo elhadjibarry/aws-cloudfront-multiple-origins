@@ -1,0 +1,89 @@
+Description:  This template deploys a CloudFront distribution with an application load balancer as the origin.
+
+#Parameters to be passed to the template at the time of deployment. 
+#You can pass these parameters through the AWS Management Console, AWS CLI, or AWS SDKs.
+#You can customize these parameters or use the default values at the time of deployment.
+Parameters:
+  ProjectName:
+    Description: The project name that is prefixed to resource names
+    Type: String
+    Default: WebApp
+
+  # Add a parameter for the CloudFront price class
+  CloudFrontPriceClass:
+    Description: The price class for the CloudFront distribution
+    Type: String
+    Default: PriceClass_All
+    AllowedValues:
+      - PriceClass_100
+      - PriceClass_200
+      - PriceClass_All
+    ConstraintDescription: Must be a valid CloudFront price class.
+
+  PrimaryApplicationLoadBalancerDNSName:
+    Description: The DNS name of the primary application load balancer
+    Type: String
+
+  FailOverApplicationLoadBalancerDNSName:
+    Description: The DNS name of the failover application load balancer
+    Type: String
+    
+  HostedZoneId:
+    Description: Optional - The ID of the Route 53 hosted zone if you want to create a Route 53 record
+    Type: String
+    Default: ""
+  DomainName:
+    Description: Optional - The domain name if you want to create a Route 53 record
+    Type: String
+    Default: ""
+
+#Conditions are used to control the creation of resources based on the input parameters or other conditions.
+#In this template, we are using a condition to check if the HostedZoneId and DomainName parameters are provided to create a Route 53 record.
+Conditions:
+  CreateRoute53Record: !And
+    - !Not [!Equals [!Ref HostedZoneId, ""]]
+    - !Not [!Equals [!Ref DomainName, ""]]
+
+#Resources are the core of the template. They represent the different AWS components that will be created when the template is deployed.
+#All the resources are tagged with the project name to easily identify them in the AWS Management Console and for billing purposes.
+Resources:
+
+  # Add CloudFront distribution
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Origins:
+          - Id: PrimaryALBOrigin
+            DomainName: !Ref PrimaryApplicationLoadBalancerDNSName
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        DefaultCacheBehavior:
+          TargetOriginId: PrimaryALBOrigin
+          ViewerProtocolPolicy: allow-all
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # AWS managed policy for CachingDisabled
+        PriceClass: !Ref CloudFrontPriceClass
+        Comment: !Sub "${ProjectName} CloudFront Distribution"
+
+# Outputs section of the template allows you to define the outputs of the template that you want to be displayed after the stack is created.
+# In this template, we are outputting the URL of the website that is served by the Application Load Balancer.
+Outputs:
+
+  Route53Record:
+    Condition: CreateRoute53Record
+    Description: The Route 53 record for the Application Load Balancer
+    Value: !Ref DomainName
+
+  CloudFrontDistributionDomainName:
+    Description: The domain name of the CloudFront distribution
+    Value: !GetAtt CloudFrontDistribution.DomainName
