@@ -55,14 +55,37 @@ Resources:
       DistributionConfig:
         Enabled: true
         Origins:
-          - Id: PrimaryALBOrigin
+          - Id: PrimaryOrigin
             DomainName: !Ref PrimaryApplicationLoadBalancerDNSName
             CustomOriginConfig:
               HTTPPort: 80
               HTTPSPort: 443
               OriginProtocolPolicy: http-only
+          - Id: FailOverOrigin
+            DomainName: !Ref FailOverApplicationLoadBalancerDNSName
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        OriginGroups:
+          Quantity: 1
+          Items:
+            - Id: OriginGroup
+              FailoverCriteria:
+                StatusCodes:
+                  Quantity: 4
+                  Items:
+                    - 500
+                    - 502
+                    - 503
+                    - 504
+              Members:
+                Quantity: 2
+                Items:
+                  - OriginId: PrimaryOrigin
+                  - OriginId: FailOverOrigin
         DefaultCacheBehavior:
-          TargetOriginId: PrimaryALBOrigin
+          TargetOriginId: OriginGroup
           ViewerProtocolPolicy: allow-all
           AllowedMethods:
             - GET

@@ -83,13 +83,6 @@ Mappings:
     eu-west-3:
       "AMI": "ami-07dc1ccdcec3b4eab"
 
-#Conditions are used to control the creation of resources based on the input parameters or other conditions.
-#In this template, we are using a condition to check if the HostedZoneId and DomainName parameters are provided to create a Route 53 record.
-Conditions:
-  CreateRoute53Record: !And
-    - !Not [!Equals [!Ref HostedZoneId, ""]]
-    - !Not [!Equals [!Ref DomainName, ""]]
-
 #Resources are the core of the template. They represent the different AWS components that will be created when the template is deployed.
 #All the resources are tagged with the project name to easily identify them in the AWS Management Console and for billing purposes.
 Resources:
@@ -453,30 +446,9 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-Application-Load-Balancer
 
-  # Route53RecordSet resource creates a Route 53 record that points to the Application Load Balancer
-  # This allows you to access the website served by the Application Load Balancer using the domain name specified in the parameters.
-  Route53RecordSet:
-    Type: AWS::Route53::RecordSet
-    Condition: CreateRoute53Record
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: !Ref DomainName
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
-        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
-
 # Outputs section of the template allows you to define the outputs of the template that you want to be displayed after the stack is created.
 # In this template, we are outputting the URL of the website that is served by the Application Load Balancer.
 Outputs:
   LoadBalancerDNSName:
     Description: URL of the website
-    Value: !Join
-      - ''
-      - - 'http://'
-        - !GetAtt ApplicationLoadBalancer.DNSName
-
-  Route53Record:
-    Condition: CreateRoute53Record
-    Description: The Route 53 record for the Application Load Balancer
-    Value: !Ref DomainName
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
