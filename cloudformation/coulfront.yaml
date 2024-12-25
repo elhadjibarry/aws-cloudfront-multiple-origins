@@ -27,22 +27,18 @@ Parameters:
   FailOverApplicationLoadBalancerDNSName:
     Description: The DNS name of the failover application load balancer
     Type: String
+
+  DomainName:
+    Description: The domain name to create a Route 53 record
+    Type: String
     
   HostedZoneId:
-    Description: Optional - The ID of the Route 53 hosted zone if you want to create a Route 53 record
+    Description: The ID of the Route 53 hosted zone to create a Route 53 record
     Type: String
-    Default: ""
-  DomainName:
-    Description: Optional - The domain name if you want to create a Route 53 record
-    Type: String
-    Default: ""
 
-#Conditions are used to control the creation of resources based on the input parameters or other conditions.
-#In this template, we are using a condition to check if the HostedZoneId and DomainName parameters are provided to create a Route 53 record.
-Conditions:
-  CreateRoute53Record: !And
-    - !Not [!Equals [!Ref HostedZoneId, ""]]
-    - !Not [!Equals [!Ref DomainName, ""]]
+  ACMCertificateArn:
+    Description: The ARN of the ACM certificate to use for CloudFront. Must be a valid ACM certificate ARN in us-east-1 region
+    Type: String
 
 #Resources are the core of the template. They represent the different AWS components that will be created when the template is deployed.
 #All the resources are tagged with the project name to easily identify them in the AWS Management Console and for billing purposes.
@@ -54,19 +50,21 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
+        Aliases:
+          - !Ref DomainName
         Origins:
           - Id: PrimaryOrigin
             DomainName: !Ref PrimaryApplicationLoadBalancerDNSName
             CustomOriginConfig:
               HTTPPort: 80
               HTTPSPort: 443
-              OriginProtocolPolicy: http-only
+              OriginProtocolPolicy: match-viewer
           - Id: FailOverOrigin
             DomainName: !Ref FailOverApplicationLoadBalancerDNSName
             CustomOriginConfig:
               HTTPPort: 80
               HTTPSPort: 443
-              OriginProtocolPolicy: http-only
+              OriginProtocolPolicy: match-viewer
         OriginGroups:
           Quantity: 1
           Items:
@@ -86,7 +84,7 @@ Resources:
                   - OriginId: FailOverOrigin
         DefaultCacheBehavior:
           TargetOriginId: OriginGroup
-          ViewerProtocolPolicy: allow-all
+          ViewerProtocolPolicy: redirect-to-https
           AllowedMethods:
             - GET
             - HEAD
@@ -96,16 +94,31 @@ Resources:
             - HEAD
           CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # AWS managed policy for CachingDisabled
         PriceClass: !Ref CloudFrontPriceClass
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2018
         Comment: !Sub "${ProjectName} CloudFront Distribution"
+
+  # Add Route 53 record for CloudFront distribution
+  CloudFrontRoute53Record:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
+      Comment: !Sub "${ProjectName} CloudFront Route 53 Record"
 
 # Outputs section of the template allows you to define the outputs of the template that you want to be displayed after the stack is created.
 # In this template, we are outputting the URL of the website that is served by the Application Load Balancer.
 Outputs:
 
   Route53Record:
-    Condition: CreateRoute53Record
     Description: The Route 53 record for the Application Load Balancer
-    Value: !Ref DomainName
+    Value: !Sub "https://${DomainName}"
 
   CloudFrontDistributionDomainName:
     Description: The domain name of the CloudFront distribution

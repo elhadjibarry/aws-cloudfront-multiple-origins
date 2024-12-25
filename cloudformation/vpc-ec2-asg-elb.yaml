@@ -54,14 +54,13 @@ Parameters:
       - t2.large
     ConstraintDescription: Must be a valid EC2 instance type.
 
-  HostedZoneId:
-    Description: Optional - The ID of the Route 53 hosted zone if you want to create a Route 53 record
-    Type: String
-    Default: ""
   DomainName:
-    Description: Optional - The domain name if you want to create a Route 53 record
     Type: String
-    Default: ""
+    Description: The domain name that will be used to create a certificate in ACM for the ALB
+
+  HostedZoneId:
+    Type: String
+    Description: The ID of the Route 53 Hosted Zone of the domain to create a certificate in ACM
 
 #Mappings are used to map keys to corresponding values that are used in the template depending on the region where the stack is being created.
 #In this template, we are using a mapping to map the region to the AMI ID of Amazon Linux 2023
@@ -306,8 +305,8 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
       - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
+        FromPort: 443
+        ToPort: 443
         CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
@@ -417,17 +416,35 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-Target-Group
 
+  # ACM Certificate resource requests a public certificate for the specified domain name.
+  # This certificate will be used by the Application Load Balancer to enable HTTPS traffic.
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub "*.${DomainName}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-Certificate
+
   # ALBListener resource creates a listener for the Application Load Balancer
   # The listener listens on port 80 and forwards traffic to the target group that we created earlier.
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref Certificate
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref EC2TargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
 
   # ApplicationLoadBalancer resource creates an Application Load Balancer
   # The Application Load Balancer distributes incoming application traffic across the EC2 instances.
@@ -446,9 +463,24 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-Application-Load-Balancer
 
+  # Add Route 53 record for ALB
+  ALBRoute53Record:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "webapp-${AWS::Region}.${DomainName}"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApplicationLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+
+
 # Outputs section of the template allows you to define the outputs of the template that you want to be displayed after the stack is created.
 # In this template, we are outputting the URL of the website that is served by the Application Load Balancer.
 Outputs:
-  LoadBalancerDNSName:
-    Description: URL of the website
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  LoadBalancerAlias:
+    Description: URL of the ALB
+    Value: !Sub "webapp-${AWS::Region}.${DomainName}"
+  CertificateArn:
+    Description: The ARN of the ACM certificate
+    Value: !Ref Certificate
