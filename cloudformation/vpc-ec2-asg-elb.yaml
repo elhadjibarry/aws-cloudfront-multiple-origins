@@ -443,8 +443,28 @@ Resources:
       Certificates:
         - CertificateArn: !Ref Certificate
       DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: 403
+            ContentType: text/plain
+            MessageBody: "Access Denied"
+
+  # Listener rule for the custom header send by CloudFront
+  ALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref ALBListener
+      Priority: 1
+      Actions:
         - Type: forward
           TargetGroupArn: !Ref EC2TargetGroup
+      Conditions:
+        - Field: http-header
+          HttpHeaderConfig:
+            HttpHeaderName: X-MyCustom-Header
+            Values:
+              - my-random-value
+      
 
   # ApplicationLoadBalancer resource creates an Application Load Balancer
   # The Application Load Balancer distributes incoming application traffic across the EC2 instances.
@@ -481,6 +501,3 @@ Outputs:
   LoadBalancerAlias:
     Description: URL of the ALB
     Value: !Sub "webapp-${AWS::Region}.${DomainName}"
-  CertificateArn:
-    Description: The ARN of the ACM certificate
-    Value: !Ref Certificate

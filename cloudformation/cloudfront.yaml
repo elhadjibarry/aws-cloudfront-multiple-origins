@@ -36,13 +36,21 @@ Parameters:
     Description: The ID of the Route 53 hosted zone to create a Route 53 record
     Type: String
 
-  ACMCertificateArn:
-    Description: The ARN of the ACM certificate to use for CloudFront. Must be a valid ACM certificate ARN in us-east-1 region
-    Type: String
-
 #Resources are the core of the template. They represent the different AWS components that will be created when the template is deployed.
 #All the resources are tagged with the project name to easily identify them in the AWS Management Console and for billing purposes.
 Resources:
+
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-Certificate
 
   # Add CloudFront distribution
   CloudFrontDistribution:
@@ -56,15 +64,19 @@ Resources:
           - Id: PrimaryOrigin
             DomainName: !Ref PrimaryApplicationLoadBalancerDNSName
             CustomOriginConfig:
-              HTTPPort: 80
               HTTPSPort: 443
               OriginProtocolPolicy: match-viewer
+            OriginCustomHeaders:
+              - HeaderName: X-MyCustom-Header
+                HeaderValue: my-random-value
           - Id: FailOverOrigin
             DomainName: !Ref FailOverApplicationLoadBalancerDNSName
             CustomOriginConfig:
-              HTTPPort: 80
               HTTPSPort: 443
               OriginProtocolPolicy: match-viewer
+            OriginCustomHeaders:
+              - HeaderName: X-MyCustom-Header
+                HeaderValue: my-random-value
         OriginGroups:
           Quantity: 1
           Items:
@@ -95,7 +107,7 @@ Resources:
           CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # AWS managed policy for CachingDisabled
         PriceClass: !Ref CloudFrontPriceClass
         ViewerCertificate:
-          AcmCertificateArn: !Ref ACMCertificateArn
+          AcmCertificateArn: !Ref Certificate
           SslSupportMethod: sni-only
           MinimumProtocolVersion: TLSv1.2_2018
         Comment: !Sub "${ProjectName} CloudFront Distribution"
@@ -119,7 +131,3 @@ Outputs:
   Route53Record:
     Description: The Route 53 record for the Application Load Balancer
     Value: !Sub "https://${DomainName}"
-
-  CloudFrontDistributionDomainName:
-    Description: The domain name of the CloudFront distribution
-    Value: !GetAtt CloudFrontDistribution.DomainName
