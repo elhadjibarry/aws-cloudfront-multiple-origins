@@ -1,4 +1,6 @@
 Description:  This template deploys a CloudFront distribution with an application load balancer as the origin.
+  The CloudFront distribution is configured with two origins (primary and failover) and an origin group for failover handling.
+  The template also creates a Route 53 record for the CloudFront distribution.
 
 #Parameters to be passed to the template at the time of deployment. 
 #You can pass these parameters through the AWS Management Console, AWS CLI, or AWS SDKs.
@@ -7,9 +9,12 @@ Parameters:
   ProjectName:
     Description: The project name that is prefixed to resource names
     Type: String
-    Default: WebApp
+    Default: CloudFront
 
   # Add a parameter for the CloudFront price class
+  # The price class determines the edge locations that are used for caching content.
+  # You can choose from PriceClass_100, PriceClass_200, or PriceClass_All.
+  # PriceClass_100 uses the least expensive edge locations, PriceClass_200 uses more edge locations, and PriceClass_All uses all edge locations.
   CloudFrontPriceClass:
     Description: The price class for the CloudFront distribution
     Type: String
@@ -20,26 +25,27 @@ Parameters:
       - PriceClass_All
     ConstraintDescription: Must be a valid CloudFront price class.
 
-  PrimaryApplicationLoadBalancerDNSName:
-    Description: The DNS name of the primary application load balancer
+  PrimaryApplicationLoadBalancerURL:
+    Description: The URL of the primary application load balancer (Output of the web-app stack in the primary region)
     Type: String
 
-  FailOverApplicationLoadBalancerDNSName:
-    Description: The DNS name of the failover application load balancer
+  FailOverApplicationLoadBalancerURL:
+    Description: The URL of the failover application load balancer (Output of the web-app stack in the failover region)
     Type: String
 
   DomainName:
-    Description: The domain name to create a Route 53 record
+    Description: The domain name to create a Route 53 record for the CloudFront distribution alias
     Type: String
     
   HostedZoneId:
-    Description: The ID of the Route 53 hosted zone to create a Route 53 record
+    Description: The ID of the Route 53 hosted zone to create a Route 53 record for the CloudFront distribution alias
     Type: String
 
 #Resources are the core of the template. They represent the different AWS components that will be created when the template is deployed.
 #All the resources are tagged with the project name to easily identify them in the AWS Management Console and for billing purposes.
 Resources:
 
+  # Add a certificate to enable HTTPS for the CloudFront distribution.
   Certificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
@@ -52,7 +58,10 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-Certificate
 
-  # Add CloudFront distribution
+  # Add CloudFront distribution with two origins (primary and failover) and an origin group for failover handling.
+  # The CloudFront distribution is configured with a custom header for the origins.
+  # The CloudFront distribution is also configured with a cache policy for caching disabled to easily test the failover behavior.
+  # The CloudFront distribution is configured with a custom SSL certificate to enable HTTPS.
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -62,7 +71,7 @@ Resources:
           - !Ref DomainName
         Origins:
           - Id: PrimaryOrigin
-            DomainName: !Ref PrimaryApplicationLoadBalancerDNSName
+            DomainName: !Ref PrimaryApplicationLoadBalancerURL
             CustomOriginConfig:
               HTTPSPort: 443
               OriginProtocolPolicy: match-viewer
@@ -70,7 +79,7 @@ Resources:
               - HeaderName: X-MyCustom-Header
                 HeaderValue: my-random-value
           - Id: FailOverOrigin
-            DomainName: !Ref FailOverApplicationLoadBalancerDNSName
+            DomainName: !Ref FailOverApplicationLoadBalancerURL
             CustomOriginConfig:
               HTTPSPort: 443
               OriginProtocolPolicy: match-viewer
@@ -112,7 +121,7 @@ Resources:
           MinimumProtocolVersion: TLSv1.2_2018
         Comment: !Sub "${ProjectName} CloudFront Distribution"
 
-  # Add Route 53 record for CloudFront distribution
+  # Add Route 53 record to map the domain name to the CloudFront distribution.
   CloudFrontRoute53Record:
     Type: AWS::Route53::RecordSet
     Properties:
@@ -125,9 +134,9 @@ Resources:
       Comment: !Sub "${ProjectName} CloudFront Route 53 Record"
 
 # Outputs section of the template allows you to define the outputs of the template that you want to be displayed after the stack is created.
-# In this template, we are outputting the URL of the website that is served by the Application Load Balancer.
+# In this template, we are outputting the domain name of the website to easily access the CloudFront distribution.
 Outputs:
 
   Route53Record:
-    Description: The Route 53 record for the Application Load Balancer
+    Description: The domain name of the website to access the CloudFront distribution
     Value: !Sub "https://${DomainName}"

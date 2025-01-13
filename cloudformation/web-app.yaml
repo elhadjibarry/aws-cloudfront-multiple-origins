@@ -1,12 +1,13 @@
-Description:  This template deploys the following resources
+Description: This template creates a simple web application with an Application Load Balancer, Auto Scaling Group, and Route 53 record.
+  It deploys the following resources
   VPC, with 2 AZs and a public and private subnet on each AZ.
   Internet gateway, with a default route on the public subnets.  
   NAT gateways (one in each AZ), and default routes for them in the private subnets.
   EC2 instance in each private subnet, with a simple web page that displays the AZ of the instance.
-  Application Load Balancer that will distribute traffic between the EC2 instances.
+  Application Load Balancer that will distribute HTTPS traffic between the EC2 instances.
   Auto Scaling Group that will maintain the desired number of EC2 instances depending on the load. 
   Security groups for the EC2 instances and the Application Load Balancer.
-  Optional - Route 53 record to point to the Application Load Balancer.
+  Route 53 record to point to the Application Load Balancer.
 
 #Parameters to be passed to the template at the time of deployment. 
 #You can pass these parameters through the AWS Management Console, AWS CLI, or AWS SDKs.
@@ -103,7 +104,7 @@ Resources:
     Properties:
       Tags:
       - Key: Name
-        Value: !Sub ${ProjectName}-IGW
+        Value: !Sub ${ProjectName}-Internet-Gateway
 
   # VPCGatewayAttachment resource attaches the internet gateway to the VPC.
   InternetGatewayAttachment:
@@ -297,7 +298,7 @@ Resources:
 
   # ALB Security Groups creates a security group that allows all traffic from the internet
   # ‘SecurityGroupIngress’ is used to specify the ingress (incoming) rules for the security group. 
-  # This security group will be used by the Application Load Balancer to allow traffic on port 80 from anywhere in the internet.
+  # This security group will be used by the Application Load Balancer to allow HTTPS traffic on port 443 from anywhere in the internet.
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -323,10 +324,7 @@ Resources:
       - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
-        SourceSecurityGroupId:
-          Fn::GetAtt:
-          - ALBSecurityGroup
-          - GroupId
+        SourceSecurityGroupId: !Ref ALBSecurityGroup
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-EC2-Security-Group
@@ -433,7 +431,9 @@ Resources:
           Value: !Sub ${ProjectName}-Certificate
 
   # ALBListener resource creates a listener for the Application Load Balancer
-  # The listener listens on port 80 and forwards traffic to the target group that we created earlier.
+  # The listener listens on port 443 and forwards traffic to the target group that we created earlier.
+  # The listener is set to HTTPS protocol and uses the certificate that we created earlier.
+  # The default action is set to return a fixed response with a status code of 403 (Access Denied) unless a custom header is present.
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -450,6 +450,7 @@ Resources:
             MessageBody: "Access Denied"
 
   # Listener rule for the custom header send by CloudFront
+  # This rule forwards the traffic to the target group if the custom header is present in the request.
   ALBListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -469,7 +470,7 @@ Resources:
   # ApplicationLoadBalancer resource creates an Application Load Balancer
   # The Application Load Balancer distributes incoming application traffic across the EC2 instances.
   # The Application Load Balancer is set to internet-facing and is associated with the public subnets.
-  # The security group is set to the ALBSecurityGroup that allows traffic from the internet on port 80.
+  # The security group is set to the ALBSecurityGroup that allows traffic from the internet on port 443.
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -483,7 +484,7 @@ Resources:
         - Key: Name
           Value: !Sub ${ProjectName}-Application-Load-Balancer
 
-  # Add Route 53 record for ALB
+  # Add Route 53 record for a user-friendly URL to point to the Application Load Balancer DNS name
   ALBRoute53Record:
     Type: AWS::Route53::RecordSet
     Properties:
@@ -499,5 +500,5 @@ Resources:
 # In this template, we are outputting the URL of the website that is served by the Application Load Balancer.
 Outputs:
   LoadBalancerAlias:
-    Description: URL of the ALB
+    Description: URL of the website that is served by the Application Load Balancer
     Value: !Sub "webapp-${AWS::Region}.${DomainName}"
