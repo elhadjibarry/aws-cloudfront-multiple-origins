@@ -63,7 +63,7 @@ The template provides the following output:
 
 ### 1.4 Deployment
 
-You can deploy the CloudFormation stack by using the AWS Management Console or running the following AWS CLI command. You will need to deploy the stack in two different regions to test the failover origin with Cloudfront. We use us-east-1 and eu-west-1 in our example, but you can choose your region of preference.
+You can deploy the CloudFormation stack by using the AWS Management Console or running the following AWS CLI command. You will need to deploy the stack in two different regions to test the failover handling with Cloudfront. We use us-east-1 and eu-west-1 in our example, but you can choose your regions of preference.
 
 ```sh
 aws cloudformation create-stack \
@@ -93,8 +93,8 @@ The template accepts the following parameters:
 | `CloudFrontPriceClass`              | The price class for the CloudFront distribution                                              | String | PriceClass_All | PriceClass_100, PriceClass_200, PriceClass_All |
 | `PrimaryApplicationLoadBalancerURL` | The URL of the primary application load balancer (Output of the web-app stack in the primary region)                                             | String |                |                         |
 | `FailOverApplicationLoadBalancerURL`| The URL of the failover application load balancer (Output of the web-app stack in the failover region)                                            | String |                |                         |
-| `DomainName`                        | The domain name for the CloudFront distribution alias                                              | String |                |                         |
-| `HostedZoneId`                      | The ID of the Route 53 hosted zone alias                                                           | String |                |                         |
+| `DomainName`                        | The domain name that will be used as an alias to point to the CloudFront distribution                                              | String |                |                         |
+| `HostedZoneId`                      | The ID of the Route 53 hosted zone of the domain name                                                           | String |                |                         |
 
 ### 2.2 Resources
 
@@ -120,11 +120,21 @@ aws cloudformation create-stack \
     --template-body file://cloudformation/cloudfront.yaml \
     --parameters ParameterKey=ProjectName,ParameterValue=Cloudfront \
                ParameterKey=CloudFrontPriceClass,ParameterValue=PriceClass_All \
-               ParameterKey=PrimaryApplicationLoadBalancerURL,ParameterValue=webapp-us-east-1.visiotechno.net \
-               ParameterKey=FailOverApplicationLoadBalancerURL,ParameterValue=webapp-eu-west-1.visiotechno.net \
+               ParameterKey=PrimaryApplicationLoadBalancerURL,ParameterValue=<primary-website-url> \
+               ParameterKey=FailOverApplicationLoadBalancerURL,ParameterValue=<failover-website-url> \
                ParameterKey=DomainName,ParameterValue=<my-domain-name> \
                ParameterKey=HostedZoneId,ParameterValue=<my-hosting-id>
 ```
+
+## 3. Testing the Solution
+
+After deploying both the Web Application and CloudFront infrastructure, you can test the solution by accessing the domain name. The CloudFront distribution will route traffic to the primary application load balancer. If the primary load balancer is not responding, the traffic will be routed to the failover load balancer.
+
+### 3.1 Testing the Application Load Balancer
+
+When you bypass CloudFront and access the application load balancer URL directly, you will get a 403 Forbidden error because the ALB is configured to check the presence of a custom header provided by CloudFront. If the header is not present, the ALB will deny the request.
+
+![Access Denied Response](diagram/access-denied-response.png)
 
 ## Cleanup
 

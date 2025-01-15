@@ -446,8 +446,30 @@ Resources:
         - Type: fixed-response
           FixedResponseConfig:
             StatusCode: 403
-            ContentType: text/plain
-            MessageBody: "Access Denied"
+            ContentType: text/html
+            MessageBody: |
+              <!DOCTYPE html>
+              <html lang="en">
+              <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <title>Access Denied</title>
+                  <style>
+                      body {
+                          font-family: Arial, sans-serif;
+                          text-align: center;
+                          margin-top: 50px;
+                      }
+                      h1 {
+                          color: #ff0000;
+                      }
+                  </style>
+              </head>
+              <body>
+                  <h1>Access Denied</h1>
+                  <p>You do not have permission to access this resource.</p>
+              </body>
+              </html>
 
   # Listener rule for the custom header send by CloudFront
   # This rule forwards the traffic to the target group if the custom header is present in the request.
