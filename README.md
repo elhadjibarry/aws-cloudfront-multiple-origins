@@ -116,7 +116,7 @@ You can deploy the CloudFormation stack using the AWS Management Console or runn
 
 ```sh
 aws cloudformation create-stack \
-    --stack-name Cloudfront \
+    --stack-name cloudfront-stack \
     --template-body file://cloudformation/cloudfront.yaml \
     --parameters ParameterKey=ProjectName,ParameterValue=Cloudfront \
                ParameterKey=CloudFrontPriceClass,ParameterValue=PriceClass_All \
@@ -132,19 +132,32 @@ After deploying both the Web Application and CloudFront infrastructure, you can 
 
 ### 3.1 Testing the Application Load Balancer
 
-When you bypass CloudFront and access the application load balancer URL directly, you will get a 403 Forbidden error because the ALB is configured to check the presence of a custom header provided by CloudFront. If the header is not present, the ALB will deny the request.
+When you bypass CloudFront and access the application load balancer URL (Output of the web-app stack with HTTPS), you will get a 403 Forbidden error because the ALB is configured to check the presence of a custom header provided by CloudFront. If the header is not present, the ALB will deny the request.
 
 ![Access Denied Response](diagram/access-denied-response.png)
 
-## Cleanup
+### 3.2 Testing the CloudFront Distribution
 
-To delete the stacks and all associated resources, run the following commands:
+When you access the domain name that points to the CloudFront distribution, you will see the web page served by the primary application load balancer. You can access it many times to see that the availability zone changes because the ALB distributes the traffic between the EC2 instances in different AZs.
+
+![Primary Response AZ1](diagram/primary-response-az1.png)
+
+![Primary Response AZ2](diagram/primary-response-az2.png)
+
+### 3.3 Testing the Failover Handling
+
+To test the failover handling, we will use the AWS Management Console to edit the security group of the EC2 instances ("WebApp-EC2-Security-Group") in the primary region and remove the inbound rule that allows HTTP traffic from the ALB. This will simulate a 504 Gateway Timeout error when accessing the domain name. Then the CloudFront distribution will route the traffic to the failover application load balancer in the other region after a few seconds. You can access the domain name many times to see the failover application load balancer distributing the traffic between the EC2 instances in different AZs.
+
+![Failover Response AZ1](diagram/failover-response-az1.png)
+
+![Failover Response AZ2](diagram/failover-response-az2.png)
+
+## 4. Cleanup the resources
+
+After testing, you can cleanup the resources to avoid the cost of AWS running services.
+To delete the stacks and all associated resources, you can use the AWS Management Console or run the following commands. The web-app stack must be deleted in both regions.
 
 ```sh
 aws cloudformation delete-stack --stack-name cloudfront-stack
 aws cloudformation delete-stack --stack-name web-app-stack
 ```
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.

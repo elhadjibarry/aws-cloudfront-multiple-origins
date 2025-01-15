@@ -351,8 +351,33 @@ Resources:
             systemctl start httpd
             systemctl enable httpd
             EC2AZ=$(TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` && curl -H "X-aws-ec2-metadata-token: $TOKEN" -v http://169.254.169.254/latest/meta-data/placement/availability-zone)
-            echo '<center><h1>This Amazon EC2 instance is located in Availability Zone: AZID </h1></center>' > /var/www/html/index.txt
-            sed "s/AZID/$EC2AZ/" /var/www/html/index.txt > /var/www/html/index.html
+            cat <<EOF > /var/www/html/index.html
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Welcome to AWS</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        text-align: center;
+                        margin-top: 50px;
+                    }
+                    h1 {
+                        color: #0073bb;
+                    }
+                    p {
+                        font-size: 20px;
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>Welcome to AWS</h1>
+                <p>This Amazon EC2 instance is located in Availability Zone: $EC2AZ</p>
+            </body>
+            </html>
+            EOF
 
   # AutoScalingGroup resource creates an Auto Scaling Group that will maintain the desired number of EC2 instances depending on the load.
   # The instances will be launched in the private subnets within two AZs using the launch template that we created earlier.
