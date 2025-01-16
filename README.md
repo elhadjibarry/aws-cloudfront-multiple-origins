@@ -8,7 +8,7 @@ Both the ALB and Cloudfront are configured with a custom SSL certificate to enab
 
 Here is the architecture diagram of the solution:
 
-![Architecture diagram](diagram/AWS%20PrivateLink.png)
+![Architecture diagram](diagram/CloudFront-Multiple-Origins.png)
 
 ### Prerequisites to deploy this solution
 - AWS account with appropriate permissions.
