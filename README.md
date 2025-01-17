@@ -1,4 +1,4 @@
-# AWS CloudFront with Multiple Origins
+# AWS CloudFront with multiple Origins
 
 AWS CloudFront is a content delivery network (CDN) service provided by Amazon Web Services (AWS). It is designed to deliver web content to users with low latency and high transfer speeds. CloudFront achieves this by caching content at edge locations around the world, which are closer to the end users. By using AWS CloudFront, you can improve the performance, security, and reliability of your web applications.
 
@@ -81,7 +81,7 @@ aws cloudformation create-stack \
 
 ## 2. CloudFront Infrastructure
 
-We will use the [cloudfront](cloudformation/cloudfront.yaml) CloudFormation template to create the CloudFront Infrastructure. This  will deploy a CloudFront distribution using the two application load balancers deployed in the previous step as origins. They will be configured in an origin group for failover handling. The template also creates a Route 53 record that will use your domain name as an alias for the CloudFront distribution.
+We will use the [cloudfront](cloudformation/cloudfront.yaml) CloudFormation template to create the CloudFront Infrastructure. This  will deploy a CloudFront distribution using the two application load balancers deployed in the previous step as origins. They will be configured in an origin group for failover handling. The template also creates a Route 53 record that will use a domain name as an alias for the CloudFront distribution.
 
 ### 2.1 Parameters
 
@@ -146,7 +146,7 @@ When you access the domain name that points to the CloudFront distribution, you 
 
 ### 3.3 Testing the Failover Handling
 
-To test the failover handling, we will use the AWS Management Console to edit the security group of the EC2 instances ("WebApp-EC2-Security-Group") in the primary region and remove the inbound rule that allows HTTP traffic from the ALB. This will simulate a 504 Gateway Timeout error when accessing the domain name. Then the CloudFront distribution will route the traffic to the failover application load balancer in the other region after a few seconds. You can access the domain name many times to see the failover application load balancer distributing the traffic between the EC2 instances in different AZs.
+To test the failover handling, you need to simulate a HTTP 500, 502, 503 or 504 server error as specified in the CloudFormation template of the CloudFront stack. To do that, we will use the AWS Management Console to edit the security group of the EC2 instances ("WebApp-EC2-Security-Group") in the primary region and remove the inbound rule that allows HTTP traffic from the ALB to the EC2 instance. This will simulate a 504 Gateway Timeout error from the Load Balancer when accessing the domain name. Then the CloudFront distribution will route the traffic to the failover application load balancer in the other region after a few seconds. You can access the domain name many times to see the failover application load balancer distributing the traffic between the EC2 instances in different AZs in the failover region.
 
 ![Failover Response AZ1](diagram/failover-response-az1.png)
 
